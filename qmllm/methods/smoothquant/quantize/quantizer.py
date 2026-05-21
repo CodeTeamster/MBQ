@@ -274,7 +274,7 @@ def get_module_by_name_suffix(model, module_name: str):
     for name, module in model.named_modules():
         if name.endswith(module_name):
             return module
-        
+
 
 @torch.no_grad()
 def pseudo_quantize_model_weight_act(
@@ -282,13 +282,22 @@ def pseudo_quantize_model_weight_act(
     w_bit,
     a_bit,
 ):
-    
     layers = get_blocks(model)
-    for i in tqdm(range(len(layers)), desc="pseudo weight activation quantization..."):
+    for i in tqdm(
+        range(len(layers)),
+        desc="pseudo weight activation quantization...",
+        unit="layer",
+    ):
         named_linears = get_named_linears(layers[i])
-        for n, m in named_linears.items():
-            new_linear = WALinear.from_float(m, weight_quant="per_channel", act_quant="per_token", w_bit=w_bit, a_bit=a_bit)
-            father_module = get_module_by_name_suffix(layers[i], '.'.join(n.split(".")[:-1]))
-            setattr(father_module, n.split('.')[-1], new_linear)
-            del new_linear, m
+        for name, module in named_linears.items():
+            new_linear = WALinear.from_float(
+                module,
+                weight_quant="per_channel",
+                act_quant="per_token",
+                w_bit=w_bit,
+                a_bit=a_bit
+            )
+            father_module = get_module_by_name_suffix(layers[i], '.'.join(name.split(".")[:-1]))
+            setattr(father_module, name.split('.')[-1], new_linear)
+            del new_linear, module
             torch.cuda.empty_cache()

@@ -5,7 +5,17 @@ from qmllm.methods.smoothquant.quantize.smooth import smooth_lm, smooth_vit
 from qmllm.methods.smoothquant.quantize.quantizer import quantize_model, pseudo_quantize_model_weight_act
 from qmllm.methods.smoothquant.quantize.gen_act_scales import get_act_scales
 
-def smoothquant_entry(model, prompt_inputs, prompt_kwargs, run_sq_process: bool, pseudo_quant: bool, scale_path: str=None, w_bit: int=4, a_bit: int=8, alpha: float=0.5):
+def smoothquant_entry(
+    model,
+    prompt_inputs,
+    prompt_kwargs,
+    run_sq_process: bool,
+    pseudo_quant: bool,
+    scale_path: str=None,
+    w_bit: int=4,
+    a_bit: int=8,
+    alpha: float=0.5
+):
     '''
     model: here the model is the LLM, you have to extract the LLM first!
     prompt_tokens: the prompt tokens

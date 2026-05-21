@@ -391,6 +391,8 @@ class LLaVA_v15(BaseModel):
     @torch.no_grad()
     def generate_input(self, data_samples, to_cpu=True, chunk_size=128):
         if to_cpu:
+            chunk_size = max(int(chunk_size), 1)
+            chunk_size = min(chunk_size, data_samples['input_ids'].shape[0])
             return self.generate_input_cpu(data_samples, chunk_size=chunk_size)
 
         data_samples['input_ids'] = data_samples['input_ids'].cuda()

@@ -117,24 +117,32 @@ def cli_quant_single(args: Union[argparse.Namespace, None] = None) -> None:
 
     # Preprocess the MLLM here, use "lm._model" to get the fp16 mllm.
     Process_ModelClass = get_process_model(args.model)
-    process_model = Process_ModelClass(lm._model,
-                                       lm._tokenizer,
-                                       lm.processor if hasattr(lm, 'processor') else None)
+    process_model = Process_ModelClass(
+        lm._model,
+        lm._tokenizer,
+        lm.processor if hasattr(lm, 'processor') else None,
+    )
 
     # Generate the calibration tokens.
     prompt_inputs = None
     prompt_kwargs = None
 
     if args.calib_data == "pileval":
-        prompt_inputs, prompt_kwargs = get_calib_dataset(data_path=args.data_path, tokenizer=lm._tokenizer, n_samples=args.n_samples)
+        prompt_inputs, prompt_kwargs = get_calib_dataset(
+            data_path=args.data_path,
+            tokenizer=lm._tokenizer,
+            n_samples=args.n_samples,
+        )
     elif args.calib_data == "coco":
-        prompt_inputs, prompt_kwargs = get_multimodal_calib_dataset(data_path=args.data_path,
-                                                                    image_folder=args.image_folder,
-                                                                    model=process_model,
-                                                                    n_samples=args.n_samples,
-                                                                    few_shot_format=args.few_shot_format,
-                                                                    interleave_format=args.interleave_format,
-                                                                    text_data_path=args.text_data_path)
+        prompt_inputs, prompt_kwargs = get_multimodal_calib_dataset(
+            data_path=args.data_path,
+            image_folder=args.image_folder,
+            model=process_model,
+            n_samples=args.n_samples,
+            few_shot_format=args.few_shot_format,
+            interleave_format=args.interleave_format,
+            text_data_path=args.text_data_path,
+        )
 
     # Wrapper the quantized model.
     qwrapper(process_model, prompt_inputs, prompt_kwargs, args)

@@ -477,7 +477,7 @@ def cli_evaluate_single(args: Union[argparse.Namespace, None] = None) -> None:
     # here we load MLLMs outside of the evaluator.
     if args.model_args is None:
         args.model_args = ""
-    
+
     ModelClass = get_model(args.model)
     lm = ModelClass.create_from_arg_string(
         args.model_args,
@@ -486,19 +486,19 @@ def cli_evaluate_single(args: Union[argparse.Namespace, None] = None) -> None:
             "device": args.device,
         },
     )
-    # 
+    #
     if args.pseudo_quant:
         print("Pseudo quant...")
         Process_ModelClass = get_process_model(args.model)
-        process_model = Process_ModelClass(lm._model, 
-                                        lm._tokenizer, 
+        process_model = Process_ModelClass(lm._model,
+                                        lm._tokenizer,
                                         lm.processor if hasattr(lm, 'processor') else None)
 
-        # 
+        #
         prompt_inputs = None
         prompt_kwargs = None
-        
-        # 
+
+        #
         qwrapper(process_model, prompt_inputs, prompt_kwargs, args)
 
     results = evaluator.simple_evaluate(

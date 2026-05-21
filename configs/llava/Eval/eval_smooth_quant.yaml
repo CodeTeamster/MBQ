@@ -1,6 +1,6 @@
 # model args
-model: llava_onevision
-model_args: pretrained="lmms-lab/llava-onevision-qwen2-7b-ov"
+model: llava
+model_args: pretrained=assets/weights/llava-v1.6-vicuna-7b
 
 # task args
 tasks: mmmu_val
@@ -9,13 +9,14 @@ log_samples: True
 log_samples_suffix: mmmu_val
 
 # quantization config
-method: mbq
+method: smoothquant
 run_process: False # You don't need to run scale search, load the scale directly
 pseudo_quant: True # if True, conduct pseudo quantization on the model, otherwise the model will stay in fp16
-scale_path: scale_cache/mbq/llava_ov_7b_w3g128.pt
-w_bit: 3
-w_group: 128
+scale_path: run/scales/smoothquant/llava_v1.6_vicuna_7b-w8a8-samples_128.pt
+w_bit: 8
+a_bit: 8
+alpha: 0.5
 
 # output args
-output_path: /your/output/log/path
+output_path: run/eval/smoothquant/llava_v1.6_vicuna_7b-w8a8-samples_128
 

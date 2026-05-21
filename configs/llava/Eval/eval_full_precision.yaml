@@ -1,0 +1,17 @@
+# model args
+model: llava
+model_args: pretrained=assets/weights/llava-v1.6-vicuna-7b
+
+# task args
+tasks: mmmu_val
+batch_size: 1
+log_samples: True
+log_samples_suffix: mmmu_val
+
+# quantization config
+method: smoothquant
+run_process: False # You don't need to run scale search, load the scale directly
+pseudo_quant: False # if True, conduct pseudo quantization on the model, otherwise the model will stay in fp16
+
+# output args
+output_path: run/eval/fullprecision/llava_v1.6_vicuna_7b
