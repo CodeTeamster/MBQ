@@ -47,6 +47,9 @@ def get_multimodal_calib_dataset(
             try:
                 if 'image' in data_item and len(data_item['image']) != 0:
                     if type(data_item['image']) == list:
+                        if len(data_item['image']) > 1:
+                            continue
+
                         images = []
                         for image_path in data_item['image']:
                             # Merge the image path
@@ -106,6 +109,7 @@ def get_multimodal_calib_dataset(
 
         examples = model.interleave_data_samples(examples, pure_text=pure_text)
 
+    # TODO: Compatibility handling for models other than llava_v15
     prompt_inputs, prompt_kwargs = model.generate_input(examples)
 
     return prompt_inputs, prompt_kwargs

@@ -171,3 +171,5 @@ cython_debug/
 run/
 !run/.gitkeep
 assets/
+logs/
+!logs/.gitkeep

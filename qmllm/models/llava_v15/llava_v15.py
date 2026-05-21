@@ -5,12 +5,13 @@ import torch
 import transformers
 
 from PIL import Image, ImageFile
+from tqdm import tqdm
 from accelerate import dispatch_model
 from accelerate.hooks import remove_hook_from_submodules
 from typing import Dict, Optional, Sequence, List
 from .dataset import (preprocess_plain, preprocess_llama_2,
-                               preprocess_v1, preprocess_mpt, 
-                               preprocess_qwen, preprocess_llama3, 
+                               preprocess_v1, preprocess_mpt,
+                               preprocess_qwen, preprocess_llama3,
                                preprocess_gemma, _add_speaker_and_signal,
                                _mask_targets, _tokenize_fn)
 try:
@@ -19,7 +20,7 @@ try:
     from llava.constants import IGNORE_INDEX, DEFAULT_IMAGE_TOKEN, DEFAULT_IM_START_TOKEN, DEFAULT_IM_END_TOKEN, IMAGE_TOKEN_INDEX
 except Exception as e:
     print("LLaVA is not installed. Please install LLaVA to use this model.\nError: %s" % e)
-    
+
 from qmllm.models.base import BaseModel
 from qmllm.utils.registry import MODEL_REGISTRY
 
@@ -82,7 +83,7 @@ class LLaVA_v15(BaseModel):
         return self.tokenizer(text)
 
     def forward(
-        self, 
+        self,
         input_ids: torch.LongTensor = None,
         inputs_embeds: Optional[torch.FloatTensor] = None,
         attention_mask: Optional[torch.Tensor] = None,
@@ -92,14 +93,14 @@ class LLaVA_v15(BaseModel):
     ):
         if input_ids is not None and inputs_embeds is not None:
             raise ValueError('You cannot specify both input_ids and inputs_embeds at the same time')
-        
+
         outputs = self.model(
             input_ids=input_ids.to(next(self.model.parameters()).device) if input_ids is not None else None,
             inputs_embeds=inputs_embeds.to(next(self.model.parameters()).device) if inputs_embeds is not None else None,
             attention_mask=attention_mask.to(next(self.model.parameters()).device) if attention_mask is not None else None,
             labels=labels.to(next(self.model.parameters()).device),
             use_cache=use_cache,
-            return_dict=return_dict,   
+            return_dict=return_dict,
         )
 
         return outputs
@@ -239,7 +240,7 @@ class LLaVA_v15(BaseModel):
 
         return data_dict
 
-    @torch.no_grad() 
+    @torch.no_grad()
     def few_shot_data_samples(self, data_samples, pad_side="right", interleave_freq=2):
         input_ids = data_samples["input_ids"]
         labels = data_samples["labels"]
@@ -268,7 +269,7 @@ class LLaVA_v15(BaseModel):
 
         # maybe we should add some codes to ensure the sequences we make are not longer than tokenizer max length
         # but now don't care it
-         
+
         max_len = max(x.shape[0] for x in new_input_ids)
         batch_size = len(new_input_ids)
         new_input_ids_padded = torch.zeros((batch_size, max_len), dtype=new_input_ids[0].dtype, device=new_input_ids[0].device)
@@ -287,11 +288,11 @@ class LLaVA_v15(BaseModel):
                     new_input_ids_padded[i, :cur_len] = cur_new_input_ids
                     new_labels_padded[i, :cur_len] = cur_new_labels
                     new_attention_mask[i, :cur_len] = True
-                    
+
         # process image_sizes, modalities, images, sample_id
         # according to the org code of llava, we find we don't need to modify pixel_values and image_flags
         new_sample_id = []
-        
+
         for i in range(0, len(sample_id) - interleave_freq + 1, interleave_freq):
             cur_sample_id = sample_id[i: i+interleave_freq]
             new_sample_id.append([item for item in cur_sample_id])
@@ -306,11 +307,11 @@ class LLaVA_v15(BaseModel):
         new_data_samples["sample_id"] = new_sample_id
 
         return new_data_samples
-    
 
-    @torch.no_grad() 
+
+    @torch.no_grad()
     def interleave_data_samples(self, data_samples, pure_text=None, pad_side="right", interleave_freq=2):
-        
+
         input_ids = data_samples["input_ids"]
         labels = data_samples["labels"]
         attention_mask = data_samples["attention_mask"]
@@ -348,7 +349,7 @@ class LLaVA_v15(BaseModel):
 
         # maybe we should add some codes to ensure the sequences we make are not longer than tokenizer max length
         # but now don't care it
-         
+
         max_len = max(x.shape[0] for x in new_input_ids)
         batch_size = len(new_input_ids)
         new_input_ids_padded = torch.zeros((batch_size, max_len), dtype=new_input_ids[0].dtype, device=new_input_ids[0].device)
@@ -367,11 +368,11 @@ class LLaVA_v15(BaseModel):
                     new_input_ids_padded[i, :cur_len] = cur_new_input_ids
                     new_labels_padded[i, :cur_len] = cur_new_labels
                     new_attention_mask[i, :cur_len] = True
-                    
+
         # process image_sizes, modalities, images, sample_id
         # according to the org code of llava, we find we don't need to modify pixel_values and image_flags
         new_sample_id = []
-        
+
         for i in range(0, len(sample_id) - interleave_freq + 1, interleave_freq):
             cur_sample_id = sample_id[i: i+interleave_freq]
             new_sample_id.append([item for item in cur_sample_id])
@@ -386,32 +387,35 @@ class LLaVA_v15(BaseModel):
         new_data_samples["sample_id"] = new_sample_id
 
         return new_data_samples
-    
+
     @torch.no_grad()
-    def generate_input(self, data_samples):
+    def generate_input(self, data_samples, to_cpu=True, chunk_size=128):
+        if to_cpu:
+            return self.generate_input_cpu(data_samples, chunk_size=chunk_size)
+
         data_samples['input_ids'] = data_samples['input_ids'].cuda()
         data_samples['attention_mask'] = data_samples['attention_mask'].cuda()
-        data_samples['labels'] = data_samples['labels'].cuda() 
+        data_samples['labels'] = data_samples['labels'].cuda()
         for i, _ in enumerate(data_samples['images']):
             data_samples['images'][i] = data_samples['images'][i].to(self.model.dtype)
-        
-        (   input_ids, 
-            position_ids, 
-            attention_mask, 
-            past_key_values, 
-            input_embeds, 
-            labels  
+
+        (
+            input_ids,
+            position_ids,
+            attention_mask,
+            past_key_values,
+            input_embeds,
+            labels
         ) = self.model.prepare_inputs_labels_for_multimodal(
-                    data_samples['input_ids'],
-                    None,
-                    data_samples['attention_mask'],
-                    None,
-                    data_samples['labels'],
-                    data_samples['images'],
-                    data_samples['modalities'],
-                    data_samples['image_sizes']
-            )
-        
+            data_samples['input_ids'],
+            None,
+            data_samples['attention_mask'],
+            None,
+            data_samples['labels'],
+            data_samples['images'],
+            data_samples['modalities'],
+            data_samples['image_sizes']
+        )
         # image_embeds = []
         # image_labels = []
         # image_attn_mask = []
@@ -420,13 +424,11 @@ class LLaVA_v15(BaseModel):
         # caption_attn_mask = []
 
         vision_sel = []
-
         for batch_idx, pre_input_ids in enumerate(data_samples['input_ids']):
             num_images = (pre_input_ids == IMAGE_TOKEN_INDEX).sum()
-        
             # remove the padding using attention mask
             pre_labels = data_samples['labels'][batch_idx]
-            pre_attn_mask = data_samples['attention_mask'][batch_idx]        
+            pre_attn_mask = data_samples['attention_mask'][batch_idx]
             pre_labels_rm_pad = pre_labels[pre_attn_mask]
             pre_len = pre_labels_rm_pad.shape[0]
 
@@ -443,7 +445,6 @@ class LLaVA_v15(BaseModel):
             image_emb_end = image_emb_start + image_emb_len
 
             cur_vision_sel = torch.zeros(post_attn_mask.shape[0], dtype=torch.bool)
-            
             for jdx in range(num_images):
                 cur_im_emb_start = image_emb_start[jdx]
                 cur_im_emb_end = image_emb_end[jdx]
@@ -474,12 +475,9 @@ class LLaVA_v15(BaseModel):
         # caption_attn_mask = torch.stack(caption_attn_mask)
 
         vision_sel = torch.stack(vision_sel)
-            
         vision_mask = vision_sel
         answer_mask = (labels != -100) # ignore token id
-            
-        
-        
+
         prompt_inputs = {
             "inputs_embeds": input_embeds
         }
@@ -492,7 +490,166 @@ class LLaVA_v15(BaseModel):
         }
 
         return prompt_inputs, prompt_kwargs
-    
+
+
+    @torch.no_grad()
+    def generate_input_cpu(self, data_samples, chunk_size=128):
+        chunk_size = max(int(chunk_size), 1)
+        all_input_embeds = []
+        all_labels = []
+        all_attention_mask = []
+        all_vision_mask = []
+
+        total_samples = data_samples['input_ids'].shape[0]
+        with tqdm(total=total_samples, desc="Preparing multimodal inputs") as pbar:
+            for start in range(0, total_samples, chunk_size):
+                end = min(start + chunk_size, total_samples)
+
+                chunk_input_ids = data_samples['input_ids'][start:end].cuda()
+                chunk_attention_mask = data_samples['attention_mask'][start:end].cuda()
+                chunk_labels = data_samples['labels'][start:end].cuda()
+
+                chunk_images = data_samples['images'][start:end]
+                for i, _ in enumerate(chunk_images):
+                    chunk_images[i] = chunk_images[i].to(self.model.dtype)
+
+                (
+                    _,
+                    _,
+                    chunk_post_attention_mask,
+                    _,
+                    chunk_input_embeds,
+                    chunk_post_labels,
+                ) = self.model.prepare_inputs_labels_for_multimodal(
+                    chunk_input_ids,
+                    None,
+                    chunk_attention_mask,
+                    None,
+                    chunk_labels,
+                    chunk_images,
+                    data_samples['modalities'][start:end],
+                    data_samples['image_sizes'][start:end]
+                )
+
+                chunk_vision_sel = []
+                for batch_idx, pre_input_ids in enumerate(chunk_input_ids):
+                    num_images = (pre_input_ids == IMAGE_TOKEN_INDEX).sum()
+
+                    pre_labels = chunk_labels[batch_idx]
+                    pre_attn_mask = chunk_attention_mask[batch_idx]
+                    pre_labels_rm_pad = pre_labels[pre_attn_mask]
+                    pre_len = pre_labels_rm_pad.shape[0]
+
+                    post_labels = chunk_post_labels[batch_idx]
+                    post_attn_mask = chunk_post_attention_mask[batch_idx]
+                    post_labels_rm_pad = post_labels[post_attn_mask]
+                    post_len = post_labels_rm_pad.shape[0]
+
+                    image_emb_len = int((post_len - pre_len + num_images) / num_images)
+                    image_emb_start = torch.where(pre_input_ids == IMAGE_TOKEN_INDEX)[0]
+                    for idx, _ in enumerate(image_emb_start):
+                        image_emb_start[idx] = image_emb_start[idx] + (image_emb_len - 1) * idx
+
+                    image_emb_end = image_emb_start + image_emb_len
+
+                    cur_vision_sel = torch.zeros(post_attn_mask.shape[0], dtype=torch.bool, device=post_attn_mask.device)
+                    for jdx in range(num_images):
+                        cur_im_emb_start = image_emb_start[jdx]
+                        cur_im_emb_end = image_emb_end[jdx]
+                        cur_vision_sel[cur_im_emb_start: cur_im_emb_end] = True
+
+                    chunk_vision_sel.append(cur_vision_sel)
+
+                chunk_vision_sel = torch.stack(chunk_vision_sel)
+
+                all_input_embeds.append(chunk_input_embeds.cpu())
+                all_labels.append(chunk_post_labels.cpu())
+                all_attention_mask.append(chunk_post_attention_mask.cpu())
+                all_vision_mask.append(chunk_vision_sel.cpu())
+
+                del (
+                    chunk_input_ids,
+                    chunk_attention_mask,
+                    chunk_labels,
+                    chunk_input_embeds,
+                    chunk_post_labels,
+                    chunk_post_attention_mask,
+                    chunk_vision_sel,
+                )
+                torch.cuda.empty_cache()
+                pbar.update(end - start)
+
+        # Global padding across chunks (prepare_inputs_labels_for_multimodal only pads inside each chunk).
+        max_len = max(x.shape[1] for x in all_input_embeds)
+        pad_side = getattr(self.model.config, "tokenizer_padding_side", "right")
+
+        padded_input_embeds = []
+        padded_labels = []
+        padded_attention_mask = []
+        padded_vision_mask = []
+
+        for cur_embeds, cur_labels, cur_attn, cur_vision in zip(all_input_embeds, all_labels, all_attention_mask, all_vision_mask):
+            cur_len = cur_embeds.shape[1]
+            if cur_len < max_len:
+                pad_len = max_len - cur_len
+
+                emb_pad = torch.zeros(
+                    (cur_embeds.shape[0], pad_len, cur_embeds.shape[2]),
+                    dtype=cur_embeds.dtype,
+                    device=cur_embeds.device,
+                )
+                label_pad = torch.full(
+                    (cur_labels.shape[0], pad_len),
+                    IGNORE_INDEX,
+                    dtype=cur_labels.dtype,
+                    device=cur_labels.device,
+                )
+                attn_pad = torch.zeros(
+                    (cur_attn.shape[0], pad_len),
+                    dtype=cur_attn.dtype,
+                    device=cur_attn.device,
+                )
+                vision_pad = torch.zeros(
+                    (cur_vision.shape[0], pad_len),
+                    dtype=cur_vision.dtype,
+                    device=cur_vision.device,
+                )
+
+                if pad_side == "left":
+                    cur_embeds = torch.cat((emb_pad, cur_embeds), dim=1)
+                    cur_labels = torch.cat((label_pad, cur_labels), dim=1)
+                    cur_attn = torch.cat((attn_pad, cur_attn), dim=1)
+                    cur_vision = torch.cat((vision_pad, cur_vision), dim=1)
+                else:
+                    cur_embeds = torch.cat((cur_embeds, emb_pad), dim=1)
+                    cur_labels = torch.cat((cur_labels, label_pad), dim=1)
+                    cur_attn = torch.cat((cur_attn, attn_pad), dim=1)
+                    cur_vision = torch.cat((cur_vision, vision_pad), dim=1)
+
+            padded_input_embeds.append(cur_embeds)
+            padded_labels.append(cur_labels)
+            padded_attention_mask.append(cur_attn)
+            padded_vision_mask.append(cur_vision)
+
+        input_embeds = torch.cat(padded_input_embeds, dim=0)
+        labels = torch.cat(padded_labels, dim=0)
+        attention_mask = torch.cat(padded_attention_mask, dim=0)
+        vision_mask = torch.cat(padded_vision_mask, dim=0)
+        answer_mask = labels != IGNORE_INDEX
+
+        prompt_inputs = {
+            "inputs_embeds": input_embeds
+        }
+
+        prompt_kwargs = {
+            "labels": labels,
+            "attention_mask": attention_mask,
+            "vision_mask": vision_mask,
+            "caption_mask": answer_mask,
+        }
+
+        return prompt_inputs, prompt_kwargs
+
 
     def pad_sequence(self, input_ids, batch_first, padding_value):
         if self.tokenizer.padding_side == "left":

@@ -1,0 +1,24 @@
+# model args
+model: llava
+model_args: pretrained=assets/weights/llava-v1.6-vicuna-7b
+
+# calibration data args
+batch_size: 1
+device: cuda:0
+calib_data: coco
+n_samples: 512
+data_path: "/home/jovyan/nas/yrc/dataset/VLM-Base/ShareGPT4V/sharegpt4v_instruct_gpt4-vision_cap100k.json"
+image_folder: "/home/jovyan/nas/yrc/dataset/VLM-Base/ShareGPT4V"
+few_shot_format: False # if True, concat two samples to simulate few shot
+interleave_format: False # if True, insert pure text data between two image-text pairs to simulate interleave data
+text_data_path: "" # You should specify this arg if you want to use interleave_format
+
+# quantization config
+method: smoothquant
+w_bit: 8
+a_bit: 8
+run_process: True
+pseudo_quant: True
+
+# output args
+scale_path: run/smoothquant/llava_v1.6_vicuna_7b_w8a8.pt
