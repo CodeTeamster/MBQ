@@ -100,7 +100,12 @@ def cli_quant_single(args: Union[argparse.Namespace, None] = None) -> None:
     # here we load MLLMs outside of the evaluator.
     if args.model_args is None:
         args.model_args = ""
-    
+
+    # RTX 4000 series can trip Accelerate/NCCL when launched directly.
+    # Set safe defaults unless the user already provided them.
+    os.environ.setdefault("NCCL_P2P_DISABLE", "1")
+    os.environ.setdefault("NCCL_IB_DISABLE", "1")
+
     ModelClass = get_model(args.model)
     lm = ModelClass.create_from_arg_string(
         args.model_args,
@@ -112,8 +117,8 @@ def cli_quant_single(args: Union[argparse.Namespace, None] = None) -> None:
 
     # Preprocess the MLLM here, use "lm._model" to get the fp16 mllm.
     Process_ModelClass = get_process_model(args.model)
-    process_model = Process_ModelClass(lm._model, 
-                                       lm._tokenizer, 
+    process_model = Process_ModelClass(lm._model,
+                                       lm._tokenizer,
                                        lm.processor if hasattr(lm, 'processor') else None)
 
     # Generate the calibration tokens.
@@ -134,6 +139,6 @@ def cli_quant_single(args: Union[argparse.Namespace, None] = None) -> None:
     # Wrapper the quantized model.
     qwrapper(process_model, prompt_inputs, prompt_kwargs, args)
 
-    
+
 if __name__ == "__main__":
     cli_quant()

@@ -1,8 +1,8 @@
 # basic requirements
 torch>=2.0
 torchvision
-xopen
-anthropic
+xopen==2.0.2
+anthropic==0.49.0
 
 # huggingface requirements
 accelerate>=0.21.0

@@ -5,6 +5,7 @@ import numpy as np
 
 from PIL import Image
 from datasets import load_dataset
+from tqdm import tqdm
 
 def load_image(image_path):
     # Load the image using use PIL, we don't support tcs_loader
@@ -19,7 +20,7 @@ def get_multimodal_calib_dataset(
     few_shot_format=False,
     interleave_format=False,
     text_data_path=None,
-    shuffle=True, 
+    shuffle=True,
 ):
     if data_path.endswith(".jsonl"):
         dataset = []
@@ -31,37 +32,50 @@ def get_multimodal_calib_dataset(
             dataset = json.load(json_file)
     else:
         raise ValueError(f"Unsupported file type: {data_path}")
-    
+
     if shuffle:
         rng = np.random.default_rng(seed=42)
         rng.shuffle(dataset)
 
     data_list = []
-    for i in range(n_samples):
-        i = i % len(dataset)
-        data_item = dataset[i]
-        if 'image' in data_item and len(data_item['image']) != 0:
-            if type(data_item['image']) == list:
-                images = []
-                for image_path in data_item['image']:
-                    # Merge the image path
-                    full_image_path = os.path.join(image_folder, image_path)
-                    image = load_image(full_image_path)
-                    images.append(image)
-            else:
-                images = []
-                image_path = data_item['image']
-                full_image_path = os.path.join(image_folder, image_path)
-                image = load_image(full_image_path)
-                images.append(image)
-        else:
-            images = None
-        
-        data_dict = model.preprocess_data(images, data_item)
-        data_list.append(data_dict)
+    i = 0
+    collected_samples = 0
+    with tqdm(total=n_samples, desc="Loading calibration samples") as pbar:
+        while collected_samples < n_samples and i < len(dataset):
+            data_item = dataset[i]
+            i += 1
+            try:
+                if 'image' in data_item and len(data_item['image']) != 0:
+                    if type(data_item['image']) == list:
+                        images = []
+                        for image_path in data_item['image']:
+                            # Merge the image path
+                            full_image_path = os.path.join(image_folder, image_path)
+                            image = load_image(full_image_path)
+                            images.append(image)
+                    else:
+                        images = []
+                        image_path = data_item['image']
+                        full_image_path = os.path.join(image_folder, image_path)
+                        image = load_image(full_image_path)
+                        images.append(image)
+                else:
+                    images = None
+
+                data_dict = model.preprocess_data(images, data_item)
+                data_list.append(data_dict)
+                collected_samples += 1
+                pbar.update(1)
+
+            except Exception:
+                # Skip samples where image is missing or loading fails
+                continue
+
+    if collected_samples < n_samples:
+        print(f"Warning: Only collected {collected_samples} valid samples out of requested {n_samples}.")
 
     examples = model.data_collator(data_list)
-    
+
     if few_shot_format and interleave_format:
         raise ValueError('You cannot specify both few_shot_format and interleave_format at the same time!')
 
@@ -80,12 +94,12 @@ def get_multimodal_calib_dataset(
         for data in dataset:
             line = data["text"].strip()
             line_encoded = model.tokenizer.encode(line)
-            
+
             if len(line_encoded) > 512:
                 sample = torch.tensor(line_encoded[:512])
                 samples.append(sample)
                 n_run += 1
-                
+
             if n_run == 128:
                 break
         pure_text = samples
@@ -94,7 +108,7 @@ def get_multimodal_calib_dataset(
 
     prompt_inputs, prompt_kwargs = model.generate_input(examples)
 
-    return prompt_inputs, prompt_kwargs 
-    
+    return prompt_inputs, prompt_kwargs
+
 
 

@@ -1,0 +1,26 @@
+# model args
+model: llava
+model_args: pretrained=assets/weights/llava-v1.6-vicuna-7b
+
+# calibration data args
+calib_data: coco
+n_samples: 128
+data_path: "/home/jovyan/nas/yrc/dataset/VLM-Base/ShareGPT4V/sharegpt4v_instruct_gpt4-vision_cap100k.json"
+image_folder: "/home/jovyan/nas/yrc/dataset/VLM-Base/ShareGPT4V"
+few_shot_format: False # if True, concat two samples to simulate few shot
+interleave_format: False # if True, insert pure text data between two image-text pairs to simulate interleave data
+text_data_path: "" # You should specify this arg if you want to use interleave_format
+
+# quantization config
+method: awq
+run_process: True
+w_bit: 8
+w_group: 128
+distort: False # if True, use distort feature map during scale search process
+reweight: True # if True, use avg gradient to reweight the loss of each modality
+loss_mode: mae
+
+# output args
+scale_path: run/awq/llava_v1.6_vicuna_7b_w8g128.pt
+
+
