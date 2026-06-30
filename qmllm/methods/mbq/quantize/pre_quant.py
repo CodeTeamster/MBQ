@@ -266,30 +266,47 @@ def run_mbq(
         model.to_cuda()
         print("Save gradient...")
         # save gradient
-        grad_cache = GradCacheHook(vis_masks=vision_mask, cap_masks=caption_mask)        
+        grad_cache = GradCacheHook(vis_masks=vision_mask, cap_masks=caption_mask)
         grad_cache.register_hooks(layers=layers)
-        
-        with torch.enable_grad():
-            mini_batch = 1
-            total_samples = next(iter(prompt_inputs.values())).shape[0]
-            accum_steps = int(total_samples/mini_batch)
-            
-            for i in tqdm.tqdm(range(0, total_samples, mini_batch), desc="Running gradient calculation..."):
-                mini_inputs = {}
-                for k in inputs:
-                    if isinstance(inputs[k], torch.Tensor):
-                        mini_inputs[k] = inputs[k][i:i+mini_batch]
-                
-                outputs = model(**mini_inputs)
 
-                loss = outputs[0]
+        param_requires_grad = {
+            param: param.requires_grad for param in model.model.parameters()
+        }
+        try:
+            for param in model.model.parameters():
+                param.requires_grad_(False)
+            model.model.zero_grad(set_to_none=True)
 
-                loss = loss / accum_steps
-                loss.backward()
+            with torch.enable_grad():
+                mini_batch = 1
+                total_samples = next(iter(prompt_inputs.values())).shape[0]
+                accum_steps = int(total_samples/mini_batch)
+
+                for i in tqdm.tqdm(range(0, total_samples, mini_batch), desc="Running gradient calculation..."):
+                    mini_inputs = {}
+                    for k in inputs:
+                        if isinstance(inputs[k], torch.Tensor):
+                            mini_inputs[k] = inputs[k][i:i+mini_batch]
+                            if mini_inputs[k].is_floating_point():
+                                mini_inputs[k] = mini_inputs[k].detach().requires_grad_(True)
+
+                    outputs = model(**mini_inputs)
+
+                    loss = outputs[0]
+
+                    loss = loss / accum_steps
+                    loss.backward()
+
+                    del outputs, loss, mini_inputs
+                    model.model.zero_grad(set_to_none=True)
+                    torch.cuda.empty_cache()
+        finally:
+            for param, requires_grad in param_requires_grad.items():
+                param.requires_grad_(requires_grad)
+            grad_cache.remove_hooks()
 
         model.to_cpu()
         grad_avg_dict = grad_cache.get_avg_grad_dict()
-        grad_cache.remove_hooks()
         del grad_cache
 
         attn_list = []

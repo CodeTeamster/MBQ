@@ -5,6 +5,17 @@ from qmllm.methods.smoothquant.quantize.smooth import smooth_lm, smooth_vit
 from qmllm.methods.smoothquant.quantize.quantizer import quantize_model, pseudo_quantize_model_weight_act
 from qmllm.methods.smoothquant.quantize.gen_act_scales import get_act_scales
 
+
+def print_act_scales(act_scales):
+    if isinstance(act_scales, dict):
+        print(f"act_scales contains {len(act_scales)} tensors")
+        for name, tensor in act_scales.items():
+            print(f"\n[{name}] shape={tuple(tensor.shape)}, dtype={tensor.dtype}, device={tensor.device}")
+            print(tensor)
+    else:
+        print("act_scales type:", type(act_scales))
+        print(act_scales)
+
 def smoothquant_entry(
     model,
     prompt_inputs,

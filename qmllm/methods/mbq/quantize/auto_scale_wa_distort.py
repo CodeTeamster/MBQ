@@ -153,8 +153,8 @@ def auto_scale_block_wa_distort(module, module_kwargs, w_bit, a_bit, q_config, i
 
             if loss_mode == "mse":
                 if ans_mask is not None and vis_mask is not None:
-                    ans_mask_expand = ans_mask.unsqueeze(-1).expand_as(out)
-                    vis_mask_expand = vis_mask.unsqueeze(-1).expand_as(out).cuda()
+                    ans_mask_expand = ans_mask.to(out.device).unsqueeze(-1).expand_as(out)
+                    vis_mask_expand = vis_mask.to(out.device).unsqueeze(-1).expand_as(out)
                     masked_diff_ans = ((org_out - out).float().pow(2) * ans_mask_expand)
                     masked_diff_vis = ((org_out - out).float().pow(2) * vis_mask_expand)
                     if reweight_ratio is not None:
@@ -164,7 +164,7 @@ def auto_scale_block_wa_distort(module, module_kwargs, w_bit, a_bit, q_config, i
                             (org_out - out).float().pow(2).mean().item()
                         ) 
                 elif ans_mask is not None and vis_mask is None:
-                    ans_mask_expand = ans_mask.unsqueeze(-1).expand_as(out)
+                    ans_mask_expand = ans_mask.to(out.device).unsqueeze(-1).expand_as(out)
                     masked_diff = ((org_out - out).float().pow(2) * ans_mask_expand)
                     loss = masked_diff.sum() / ans_mask_expand.sum() 
                 else:
@@ -173,8 +173,8 @@ def auto_scale_block_wa_distort(module, module_kwargs, w_bit, a_bit, q_config, i
                     )  # float prevents overflow
             elif loss_mode == "mae":
                 if ans_mask is not None and vis_mask is not None:
-                    ans_mask_expand = ans_mask.unsqueeze(-1).expand_as(out)
-                    vis_mask_expand = vis_mask.unsqueeze(-1).expand_as(out).cuda()
+                    ans_mask_expand = ans_mask.to(out.device).unsqueeze(-1).expand_as(out)
+                    vis_mask_expand = vis_mask.to(out.device).unsqueeze(-1).expand_as(out)
                     masked_diff_ans = ((org_out - out).float().abs() * ans_mask_expand)
                     masked_diff_vis = ((org_out - out).float().abs() * vis_mask_expand)
                     if reweight_ratio is not None:
@@ -184,7 +184,7 @@ def auto_scale_block_wa_distort(module, module_kwargs, w_bit, a_bit, q_config, i
                             (org_out - out).float().abs().mean().item()
                         ) 
                 elif ans_mask is not None and vis_mask is None:
-                    ans_mask_expand = ans_mask.unsqueeze(-1).expand_as(out)
+                    ans_mask_expand = ans_mask.to(out.device).unsqueeze(-1).expand_as(out)
                     masked_diff = ((org_out - out).float().abs() * ans_mask_expand)
                     loss = masked_diff.sum() / ans_mask_expand.sum() 
                 else:

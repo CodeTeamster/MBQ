@@ -9,6 +9,7 @@ import warnings
 from functools import partial
 
 import numpy as np
+import torch
 import yaml
 
 warnings.simplefilter("ignore", category=DeprecationWarning)
@@ -59,7 +60,7 @@ def parse_quant_args() -> argparse.Namespace:
     parser.add_argument("--method", default="awq", choices=["awq", "smoothquant", "mbq", "rtn", None])
     parser.add_argument("--w_bit", default=8, type=int)
     parser.add_argument("--a_bit", default=16, type=int)
-    parser.add_argument("--w_group", default=128, type=int)
+    parser.add_argument("--w_group", default=None, type=int)
     parser.add_argument("--alpha", default=0.5, type=float)
     parser.add_argument("--reweight", action="store_true")
     parser.add_argument("--distort", action="store_true")
@@ -105,6 +106,8 @@ def cli_quant_single(args: Union[argparse.Namespace, None] = None) -> None:
     # Set safe defaults unless the user already provided them.
     os.environ.setdefault("NCCL_P2P_DISABLE", "1")
     os.environ.setdefault("NCCL_IB_DISABLE", "1")
+    if args.device and args.device.startswith("cuda"):
+        torch.cuda.set_device(torch.device(args.device))
 
     ModelClass = get_model(args.model)
     lm = ModelClass.create_from_arg_string(

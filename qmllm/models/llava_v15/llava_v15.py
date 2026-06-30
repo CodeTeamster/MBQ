@@ -32,6 +32,7 @@ class LLaVA_v15(BaseModel):
 
         self.num_params = sum(p.numel() for p in self.model.parameters())
         self.device_map = getattr(model, 'hf_device_map', {})
+        self.device = next(model.parameters()).device
         self.vision_tower = model.get_vision_tower()
         self.image_aspect_ratio = 'pad'
         self.image_processor = self.vision_tower.image_processor
@@ -110,7 +111,7 @@ class LLaVA_v15(BaseModel):
         if self.num_params > 20 * 10 ** 9: # 20B model
             self.model = dispatch_model(self.model, device_map=self.device_map)
         else:
-            self.model = self.model.cuda()
+            self.model = self.model.to(self.device)
 
     def to_cpu(self):
         if self.num_params > 20 * 10 ** 9: # 20B model

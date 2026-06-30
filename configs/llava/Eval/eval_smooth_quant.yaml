@@ -12,11 +12,11 @@ log_samples_suffix: mmmu_val
 method: smoothquant
 run_process: False # You don't need to run scale search, load the scale directly
 pseudo_quant: True # if True, conduct pseudo quantization on the model, otherwise the model will stay in fp16
-scale_path: run/scales/smoothquant/llava_v1.6_vicuna_7b-w8a8-samples_128.pt
+scale_path: run/scales/smoothquant/llava_v1.6_vicuna_7b-w8a8-samples_256.pt
 w_bit: 8
 a_bit: 8
 alpha: 0.5
 
 # output args
-output_path: run/eval/smoothquant/llava_v1.6_vicuna_7b-w8a8-samples_128
+output_path: run/eval/smoothquant/llava_v1.6_vicuna_7b-w8a8-samples_256
 

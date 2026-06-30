@@ -5,9 +5,9 @@ from qmllm.methods.mbq.quantize.pre_quant import run_mbq, apply_mbq
 from qmllm.methods.mbq.quantize.quantizer import pseudo_quantize_model_weight, pseudo_quantize_model_weight_act
 
 
-def mbq_entry(model, prompt_inputs, prompt_kwargs, run_mbq_process: bool, pseudo_quant: bool, scale_path: str=None, zero_point: str=True, q_group_size: int=128, w_bit: int=4, a_bit: int=16, wa_quant: bool=False, reweight: bool=False, distort: bool=False, loss_mode: str="mae"):
+def mbq_entry(model, prompt_inputs, prompt_kwargs, run_mbq_process: bool, pseudo_quant: bool, scale_path: str=None, zero_point: str=True, q_group_size: int=-1, w_bit: int=4, a_bit: int=16, wa_quant: bool=False, reweight: bool=False, distort: bool=False, loss_mode: str="mae"):
     '''
-    model: here the model is the LLM, you have to extract the LLM first! 
+    model: here the model is the LLM, you have to extract the LLM first!
     prompt_tokens: the prompt tokens
     prompt_mask: the prompt mask, mask the answer language tokens
     run_mbq_process: whether to run the MBQ process
@@ -36,10 +36,10 @@ def mbq_entry(model, prompt_inputs, prompt_kwargs, run_mbq_process: bool, pseudo
             reweight=reweight,
             distort=distort,
         )
-        
+
         dirpath = os.path.dirname(scale_path)
         os.makedirs(dirpath, exist_ok=True)
-        
+
         torch.save(mbq_results, scale_path)
         print("MBQ results saved at", scale_path)
 
